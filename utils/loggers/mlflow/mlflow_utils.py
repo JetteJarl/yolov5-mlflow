@@ -20,6 +20,8 @@ except (ImportError, AssertionError):
 
 from collections.abc import MutableMapping
 
+MLFLOW_ARTIFACT_PREFIX = 'mlflow://'
+
 
 class MlflowLogger:
     """Log training run, artifacts, parameters, and metrics to Mlflow.
@@ -35,13 +37,17 @@ class MlflowLogger:
         """
         prefix = colorstr("Mlflow: ")
         try:
-            self.mlflow, self.mlflow_active_run = mlflow, None if not mlflow else mlflow.start_run()
+            run_id = None
+            if isinstance(opt.resume, str) and opt.resume.startswith(MLFLOW_ARTIFACT_PREFIX):
+                run_id = opt.resume.replace(MLFLOW_ARTIFACT_PREFIX, "")
+            self.mlflow = mlflow
+            self.mlflow_active_run = None if not self.mlflow else mlflow.start_run(run_id=run_id)
             if self.mlflow_active_run is not None:
                 self.run_id = self.mlflow_active_run.info.run_id
                 LOGGER.info(f"{prefix}Using run_id({self.run_id})")
                 self.setup(opt)
         except Exception as err:
-            LOGGER.error(f"{prefix}Failing init - {repr(err)}")
+            LOGGER.error(f"{prefix}Failing init - {repr(err)}", exc_info=1)
             LOGGER.warning(f"{prefix}Continuining without Mlflow")
             self.mlflow = None
             self.mlflow_active_run = None
@@ -132,3 +138,57 @@ class MlflowLogger:
         """Member function to end mlflow run.
         """
         self.mlflow.end_run()
+
+
+def download_checkpoint(opt, run_id, mlflow_client, path):
+    model_dir: Path = Path(opt.project) / run_id / "weights"
+    if not model_dir.exists() and not model_dir.is_dir():
+        model_dir.mkdir(parents=True)
+
+    artifact = mlflow_client.download_artifacts(run_id=run_id, path=path, dst_path=model_dir)
+
+    return artifact
+
+
+def download_run_artifacts(opt):
+    """Restores run parameters to its original state based on model checkpoint
+    and logged Experiment parameters.
+
+    Args:
+        opt (argparse.Namespace): command line args passed to Yolov5 training script
+
+    Returns:
+
+    """
+    file_path = None
+    client = mlflow.tracking.MlflowClient()
+    run_id = opt.resume.replace(MLFLOW_ARTIFACT_PREFIX, "")
+    artifacts = client.list_artifacts(run_id=run_id)
+    saved_models = []
+    for artifact in artifacts:
+        if str(artifact.path).startswith("yolov5"):
+            saved_models = client.list_artifacts(run_id=run_id, path=str(artifact.path) + "/last")
+            LOGGER.info(str(saved_models))
+            break
+
+    if len(saved_models) > 0:
+        saved_models = sorted(saved_models, key=lambda x: int(Path(x.path).stem), reverse=True)
+        file_path = download_checkpoint(opt=opt,
+                                        run_id=run_id,
+                                        mlflow_client=client,
+                                        path=str(saved_models[0].path) + "/artifacts/last.pt")
+
+    return file_path
+
+
+def check_mlflow_resume(opt):
+    if mlflow is None:
+        return False
+
+    if opt.resume.startswith(MLFLOW_ARTIFACT_PREFIX):
+        file_path = download_run_artifacts(opt)
+        LOGGER.info("From mlflow resume, " + str(file_path))
+        opt.weights = str(file_path)
+        return True
+
+    return False
