@@ -5,6 +5,8 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict
 
+import torch
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[3]
 if str(ROOT) not in sys.path:
@@ -56,6 +58,7 @@ class MlflowLogger:
         self.client = mlflow.tracking.MlflowClient()
         self.log_params(vars(opt))
         self.log_metrics(vars(opt), is_param=True)
+        self.current_epoch = {}
 
     @staticmethod
     def _flatten_params(params_dict, parent_key="", sep="/"):
@@ -90,10 +93,10 @@ class MlflowLogger:
             model_path: Path to the model .pt being logged
             model_name: Name (or path) relative to experiment for logging model in mlflow
         """
-        self.mlflow.pyfunc.log_model(artifact_path=self.model_name if model_name is None else model_name,
-                                     code_path=[str(ROOT.resolve())],
-                                     artifacts={"model_path": str(model_path.resolve())},
-                                     python_model=self.mlflow.pyfunc.PythonModel())
+        # self.mlflow.pyfunc.log_model(artifact_path=self.model_name if model_name is None else model_name,
+        #                              code_path=[str(ROOT.resolve())],
+        #                              artifacts={"model_path": str(model_path.resolve())},
+        #                              python_model=self.mlflow.pyfunc.PythonModel())
 
     def log_params(self, params: Dict[str, Any]) -> None:
         """Member funtion to log parameters.
@@ -122,11 +125,21 @@ class MlflowLogger:
             epoch (int, optional): Training epoch. Defaults to None.
             is_param (bool, optional): Set it to True to log keys with a prefix "params/". Defaults to False.
         """
+
+
         prefix = "param/" if is_param else ""
+
+        for k, v in metrics.items():
+            if torch.is_tensor(v):
+                metrics[k] = v.item()
+
         metrics_dict = {
             f"{prefix}{k.replace(':','-')}": float(v)
             for k, v in metrics.items() if (isinstance(v, float) or isinstance(v, int))}
         self.mlflow.log_metrics(metrics=metrics_dict, step=epoch)
+
+    def log_metric(self, key: str, value: float):
+        self.mlflow.log_metric(key, value, self.current_epoch)
 
     def finish_run(self) -> None:
         """Member function to end mlflow run.
