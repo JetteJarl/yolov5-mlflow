@@ -90,10 +90,6 @@ class Loggers():
         self.csv = True  # always log to csv
 
         # Messages
-        # if not wandb:
-        #     prefix = colorstr('Weights & Biases: ')
-        #     s = f"{prefix}run 'pip install wandb' to automatically track and visualize YOLOv5 🚀 runs in Weights & Biases"
-        #     self.logger.info(s)
         if not clearml:
             prefix = colorstr('ClearML: ')
             s = f"{prefix}run 'pip install clearml' to automatically track, visualize and remotely train YOLOv5 🚀 in ClearML"
@@ -111,14 +107,8 @@ class Loggers():
 
         # W&B
         if wandb and 'wandb' in self.include:
-            wandb_artifact_resume = isinstance(self.opt.resume, str) and self.opt.resume.startswith('wandb-artifact://')
-            run_id = torch.load(self.weights).get('wandb_id') if self.opt.resume and not wandb_artifact_resume else None
             self.opt.hyp = self.hyp  # add hyperparameters
-            self.wandb = WandbLogger(self.opt, run_id)
-            # temp warn. because nested artifacts not supported after 0.12.10
-            # if pkg.parse_version(wandb.__version__) >= pkg.parse_version('0.12.11'):
-            #    s = "YOLOv5 temporarily requires wandb version 0.12.10 or below. Some features may not work as expected."
-            #    self.logger.warning(s)
+            self.wandb = WandbLogger(self.opt)
         else:
             self.wandb = None
 
@@ -137,8 +127,8 @@ class Loggers():
 
         # Comet
         if comet_ml and 'comet' in self.include:
-            if isinstance(self.opt.resume, str) and self.opt.resume.startswith("comet://"):
-                run_id = self.opt.resume.split("/")[-1]
+            if isinstance(self.opt.resume, str) and self.opt.resume.startswith('comet://'):
+                run_id = self.opt.resume.split('/')[-1]
                 self.comet_logger = CometLogger(self.opt, self.hyp, run_id=run_id)
 
             else:
@@ -180,7 +170,7 @@ class Loggers():
             plot_labels(labels, names, self.save_dir)
             paths = self.save_dir.glob('*labels*.jpg')  # training labels
             if self.wandb:
-                self.wandb.log({"Labels": [wandb.Image(str(x), caption=x.name) for x in paths]})
+                self.wandb.log({'Labels': [wandb.Image(str(x), caption=x.name) for x in paths]})
             # if self.clearml:
             #    pass  # ClearML saves these images automatically using hooks
 
@@ -191,7 +181,7 @@ class Loggers():
                 [self.mlflow.log_artifacts(x, "labels") for x in paths]
 
     def on_train_batch_end(self, model, ni, imgs, targets, paths, vals):
-        log_dict = dict(zip(self.keys[0:3], vals))
+        log_dict = dict(zip(self.keys[:3], vals))
         # Callback runs on train batch end
         # ni: number integrated batches (since train start)
         if self.plots:
@@ -240,7 +230,7 @@ class Loggers():
         if self.wandb or self.clearml or self.mlflow:
             files = sorted(self.save_dir.glob('val*.jpg'))
             if self.wandb:
-                self.wandb.log({"Validation": [wandb.Image(str(f), caption=f.name) for f in files]})
+                self.wandb.log({'Validation': [wandb.Image(str(f), caption=f.name) for f in files]})
             if self.clearml:
                 self.clearml.log_debug_samples(files, title='Validation')
             if self.mlflow:
@@ -273,7 +263,7 @@ class Loggers():
                 for i, name in enumerate(self.best_keys):
                     self.wandb.wandb_run.summary[name] = best_results[i]  # log best results in the summary
             self.wandb.log(x)
-            self.wandb.end_epoch(best_result=best_fitness == fi)
+            self.wandb.end_epoch()
 
         if self.mlflow:
             self.mlflow.log_metrics(metrics=x, epoch=epoch)
@@ -318,7 +308,7 @@ class Loggers():
 
         if self.wandb:
             self.wandb.log(dict(zip(self.keys[3:10], results)))
-            self.wandb.log({"Results": [wandb.Image(str(f), caption=f.name) for f in files]})
+            self.wandb.log({'Results': [wandb.Image(str(f), caption=f.name) for f in files]})
             # Calling wandb.log. TODO: Refactor this into WandbLogger.log_model
             if not self.opt.evolve:
                 wandb.log_artifact(str(best if best.exists() else last),
@@ -433,7 +423,7 @@ class GenericLogger:
     def log_model(self, model_path, epoch=0, metadata={}):
         # Log model to all loggers
         if self.wandb:
-            art = wandb.Artifact(name=f"run_{wandb.run.id}_model", type="model", metadata=metadata)
+            art = wandb.Artifact(name=f'run_{wandb.run.id}_model', type='model', metadata=metadata)
             art.add_file(str(model_path))
             wandb.log_artifact(art)
 
@@ -441,7 +431,7 @@ class GenericLogger:
             self.mlflow.log_model(model_path=model_path, model_name=f"{self.mlflow.model_name}/{epoch}")
 
     def update_params(self, params):
-        # Update the paramters logged
+        # Update the parameters logged
         if self.wandb:
             wandb.run.config.update(params, allow_val_change=True)
 
