@@ -1,0 +1,10 @@
+name: yolov5
+
+entry_points:
+  main:
+    parameters:
+      model-cfg: { type: string, default: "yolov5n.yaml"}
+      epochs: { type: int, default: 64}
+      batch-size: { type: int, default: 16}
+
+    command: "python3 train.py --data custom.yaml --epochs {epochs} --weights '' --cfg {model-cfg} --batch-size {batch-size} --cache"
