@@ -79,12 +79,12 @@ class MlflowLogger:
             artifact (Path): File or folder to be logged
             relpath (str): Name (or path) relative to experiment for logging artifact in mlflow
         """
-        if not isinstance(artifact, Path):
-            artifact = Path(artifact)
-        if artifact.is_dir():
-            self.mlflow.log_artifacts(f"{artifact.resolve()}/", artifact_path=str(artifact.stem))
-        else:
-            self.mlflow.log_artifact(str(artifact.resolve()), artifact_path=relpath)
+        #if not isinstance(artifact, Path):
+        #    artifact = Path(artifact)
+        #if artifact.is_dir():
+        #    self.mlflow.log_artifacts(f"{artifact.resolve()}/", artifact_path=str(artifact.stem))
+        #else:
+        #    self.mlflow.log_artifact(str(artifact.resolve()), artifact_path=relpath)
 
     def log_model(self, model_path: Path, model_name: str = None) -> None:
         """Member function to log model as an Mlflow model.
