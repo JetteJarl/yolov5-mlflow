@@ -8,4 +8,4 @@ entry_points:
       batch-size: { type: int, default: 16}
       data: { type: string, default: 'custom.yaml'}
 
-    command: "python3 train.py --data {data} --epochs {epochs} --weights '' --cfg {model-cfg} --batch-size {batch-size} --cache"
+    command: "python3 train.py --data {data} --epochs {epochs} --weights '' --cfg {model-cfg} --batch-size {batch-size} --cache --save-period=32"
