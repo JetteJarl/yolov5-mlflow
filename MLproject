@@ -1,5 +1,7 @@
 name: yolov5
 
+python_env: requirements_gpu.yaml
+
 entry_points:
   main:
     parameters:
